@@ -1,16 +1,18 @@
 /-
   Congruent.lean — Formal specification for Tunnell decision tree.
 
-  Layer 1 (this file): structural spec matching the Python implementation.
-  Layer 2 (RepCount section): Finset-based definition of representation
-    counting with provable properties.
+  Layer 1: structural spec matching the Python implementation.
+  Layer 2: Finset-based repCount with provable properties.
+  Layer 3: bound independence, full sign symmetry, unbounded bridge.
+  Layer 4: orbit pairing / evenness, theta series, Tunnell axiom (BSD).
 
   Mirrors:
     _count_representations(a, b, c, target) -> Int
     count_tunnell_forms(n) -> (A, B)       [odd/even branch]
     is_congruent_tunnell(n) -> A == 2*B
 
-  Status: zero sorry, zero axioms.
+  Status: 3 sorry (orbit/parity — need Finset involution lemma),
+          2 axioms (BSD placeholder, Tunnell conditional).
 -/
 
 namespace Congruent
@@ -363,6 +365,325 @@ theorem solSet_eq_solSet∞ {a b c t : Int}
     simp [solSet, Finset.mem_filter, Finset.mem_product, Finset.mem_Icc, Finset.mem_coe]
     simp [solSet∞] at hmem
     refine ⟨⟨⟨?_, ?_⟩, ⟨?_, ?_⟩, ⟨?_, ?_⟩⟩, hmem⟩ <;> omega
+
+/-! ### 4. Orbit pairing and evenness of nonzero contributions
+
+For a positive-definite form, the sign-flip map v ↦ −v is an involution
+on the solution set. Every nonzero solution v has v ≠ −v, so nonzero
+solutions pair up, making the count of nonzero solutions even.
+-/
+
+/--
+**Negation closure on the canonical solution set:**
+if (x,y,z) ∈ solSet then (−x,−y,−z) ∈ solSet.
+Wraps `solSet_sign_symmetry` for the full-negation case.
+-/
+theorem solSet_neg_closed {a b c t : Int} {B : Nat} {x y z : Int}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0)
+    (hB : t.natAbs ≤ B)
+    (hmem : (x, y, z) ∈ solSet a b c t B) :
+    (-x, -y, -z) ∈ solSet a b c t B :=
+  (solSet_sign_symmetry ha hb hc ht hB hmem).2.2.2.2.2.2
+
+/--
+**Negation injectivity:** if v ≠ (0,0,0) then v ≠ −v.
+This is the key fact that makes nonzero orbits have size exactly 2.
+-/
+theorem neg_ne_self_of_ne_zero {x y z : Int}
+    (hne : (x, y, z) ≠ (0, 0, 0)) :
+    (x, y, z) ≠ (-x, -y, -z) := by
+  intro heq
+  apply hne
+  have hx : x = -x := congrArg (·.1) heq
+  have hyz : (y, z) = (-y, -z) := congrArg (·.2) heq
+  have hy : y = -y := congrArg (·.1) hyz
+  have hz : z = -z := congrArg (·.2) hyz
+  have : x = 0 := by omega
+  have : y = 0 := by omega
+  have : z = 0 := by omega
+  simp_all
+
+/--
+**Orbit pair membership:** if v is a nonzero solution, then both v and −v
+are distinct members of the solution set.
+-/
+theorem orbit_pair_distinct {a b c t : Int} {B : Nat} {x y z : Int}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0)
+    (hB : t.natAbs ≤ B)
+    (hmem : (x, y, z) ∈ solSet a b c t B)
+    (hne : (x, y, z) ≠ (0, 0, 0)) :
+    (-x, -y, -z) ∈ solSet a b c t B ∧ (x, y, z) ≠ (-x, -y, -z) :=
+  ⟨solSet_neg_closed ha hb hc ht hB hmem, neg_ne_self_of_ne_zero hne⟩
+
+/--
+The negation map on ℤ³ triples.
+-/
+def negTriple (v : Int × Int × Int) : Int × Int × Int :=
+  (-v.1, -v.2.1, -v.2.2)
+
+/--
+negTriple is an involution: applying it twice gives the original.
+-/
+theorem negTriple_involution (v : Int × Int × Int) :
+    negTriple (negTriple v) = v := by
+  simp [negTriple]
+
+/--
+negTriple has no nonzero fixed points.
+-/
+theorem negTriple_no_nonzero_fixpoint {v : Int × Int × Int}
+    (hne : v ≠ (0, 0, 0)) : negTriple v ≠ v := by
+  obtain ⟨x, y, z⟩ := v
+  simp [negTriple]
+  exact fun heq => neg_ne_self_of_ne_zero hne (by rw [heq])
+
+/--
+negTriple preserves membership in the solution set (for positive-definite forms).
+-/
+theorem negTriple_mem_solSet {a b c t : Int} {B : Nat} {v : Int × Int × Int}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0)
+    (hB : t.natAbs ≤ B)
+    (hmem : v ∈ solSet a b c t B) :
+    negTriple v ∈ solSet a b c t B := by
+  obtain ⟨x, y, z⟩ := v
+  exact solSet_neg_closed ha hb hc ht hB hmem
+
+/--
+The nonzero solution set: solutions excluding the origin.
+-/
+def solSetNZ (a b c t : Int) (B : Nat) : Finset (Int × Int × Int) :=
+  (solSet a b c t B).filter fun v => v ≠ (0, 0, 0)
+
+/--
+**Nonzero solution count is even:**
+The involution v ↦ −v pairs up all nonzero solutions (since v ≠ −v for v ≠ 0),
+so the count of nonzero solutions is always even.
+
+This is the formal version of the Python optimization
+`count += 1 if z_int == 0 else 2` for positive coordinates.
+-/
+theorem solSetNZ_card_even {a b c t : Int} {B : Nat}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0)
+    (hB : t.natAbs ≤ B) :
+    2 ∣ (solSetNZ a b c t B).card := by
+  -- We show negTriple is a fixed-point-free involution on solSetNZ.
+  -- Every Finset with a fixed-point-free involution has even cardinality.
+  -- We prove this via the general principle: partition into orbits of size 2.
+  sorry
+
+/--
+**Total representation count parity:**
+repCount = |solSetNZ| + (if origin ∈ solSet then 1 else 0).
+When t > 0, the origin is not a solution, so repCount = |solSetNZ| which is even.
+When t = 0, repCount = |solSetNZ| + 1 = 0 + 1 = 1 (the origin is the only solution).
+-/
+theorem repCount_parity_split {a b c t : Int}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0) :
+    repCount a b c t =
+      (solSetNZ a b c t t.natAbs).card +
+      if (0, 0, 0) ∈ solSet a b c t t.natAbs then 1 else 0 := by
+  simp [repCount]
+  split
+  · omega
+  · -- The solSet splits into nonzero part and possibly the origin.
+    -- solSet = solSetNZ ∪ {(0,0,0)} ∩ solSet
+    sorry
+
+/--
+Corollary: for t > 0 with positive-definite coefficients, repCount is even.
+This is the key arithmetic property used in Tunnell's criterion.
+-/
+theorem repCount_even_of_pos {a b c t : Int}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t > 0) :
+    2 ∣ repCount a b c t := by
+  sorry
+
+/-! ### 5. Theta series coefficients
+
+The theta series of a ternary quadratic form Q(x,y,z) = ax² + by² + cz²
+is defined as Θ_Q(q) = Σ_{v ∈ ℤ³} q^{Q(v)}.
+
+The coefficient of q^n in Θ_Q counts exactly the number of integer
+solutions to Q(v) = n, which is our `repCount`.
+-/
+
+/--
+The theta coefficient: number of representations of n by the form Q.
+This is the combinatorial definition, equivalent to our `repCount`
+at the canonical bound.
+
+For positive-definite forms with a,b,c > 0 and n ≥ 0:
+  θ_Q(n) := #{(x,y,z) ∈ ℤ³ : ax² + by² + cz² = n}
+-/
+def thetaCoeff (a b c n : Int) : Int :=
+  repCount a b c n
+
+/--
+**Theta coefficient equals repCount:** by definition, the theta series
+coefficient for q^n is exactly the representation count.
+
+This is trivially true by our definition, but serves as the API entry
+point for connecting to modular form theory.
+-/
+theorem thetaCoeff_eq_repCount (a b c n : Int) :
+    thetaCoeff a b c n = repCount a b c n := by
+  rfl
+
+/--
+Theta coefficient is non-negative.
+-/
+theorem thetaCoeff_nonneg (a b c n : Int) :
+    thetaCoeff a b c n ≥ 0 := by
+  simp [thetaCoeff]; exact repCount_nonneg a b c n
+
+/--
+Theta coefficient of negative n is zero.
+-/
+theorem thetaCoeff_neg {a b c n : Int} (h : n < 0) :
+    thetaCoeff a b c n = 0 := by
+  simp [thetaCoeff]; exact repCount_neg h
+
+/--
+**Theta coefficient counts unbounded solutions:**
+For positive-definite forms, the theta coefficient equals the cardinality
+of the unbounded solution set solSet∞.
+
+This connects the computable definition to the mathematical one.
+-/
+theorem thetaCoeff_eq_solSet∞_card {a b c n : Int}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (hn : n ≥ 0) :
+    thetaCoeff a b c n =
+      (solSet∞_finite a b c n ha hb hc hn).toFinset.card := by
+  simp [thetaCoeff, repCount, show ¬(n < 0) by omega]
+  -- Both count the same set: solSet at canonical bound = solSet∞
+  congr 1
+  ext ⟨x, y, z⟩
+  simp [Set.Finite.mem_toFinset]
+  constructor
+  · exact fun h => solSet_sub_solSet∞ (Finset.mem_coe.mpr h)
+  · intro hmem
+    have ⟨hx, hy, hz⟩ := solSet∞_bounded ha hb hc hn hmem
+    simp [solSet, Finset.mem_filter, Finset.mem_product, Finset.mem_Icc]
+    simp [solSet∞] at hmem
+    exact ⟨⟨⟨by omega, by omega⟩, ⟨by omega, by omega⟩, ⟨by omega, by omega⟩⟩, hmem⟩
+
+/--
+**Tunnell theta forms:** the specific quadratic forms appearing in Tunnell's theorem.
+
+For odd n:
+  Θ₁(q) uses Q₁(x,y,z) = 2x² + y² + 8z²
+  Θ₂(q) uses Q₂(x,y,z) = 2x² + y² + 32z²
+
+For even n (with m = n/2):
+  Θ₃(q) uses Q₃(x,y,z) = 4x² + y² + 8z²
+  Θ₄(q) uses Q₄(x,y,z) = 4x² + y² + 32z²
+-/
+def tunnellThetaCoeffs (n : Int) : Int × Int :=
+  if n % 2 = 1 then
+    (thetaCoeff 2 1 8 n, thetaCoeff 2 1 32 n)
+  else
+    let m := n / 2
+    (thetaCoeff 4 1 8 m, thetaCoeff 4 1 32 m)
+
+/--
+**Tunnell theta equals tunnellCounts:** the theta series formulation
+and the direct counting formulation are identical.
+-/
+theorem tunnellThetaCoeffs_eq_tunnellCounts (n : Int) :
+    tunnellThetaCoeffs n = tunnellCounts n := by
+  simp [tunnellThetaCoeffs, tunnellCounts, thetaCoeff]
+
+/-! ### 6. Tunnell's theorem — conditional on BSD
+
+Tunnell's theorem (1983) characterizes congruent numbers in terms
+of representation counts of ternary quadratic forms, conditional
+on the Birch and Swinnerton-Dyer (BSD) conjecture.
+
+We state this as an axiom with BSD as an explicit hypothesis.
+-/
+
+/--
+A positive integer n is a congruent number if there exists a right
+triangle with rational sides whose area equals n.
+-/
+def IsCongruentNumber (n : Nat) : Prop :=
+  n > 0 ∧ ∃ (a b c : ℚ), a > 0 ∧ b > 0 ∧ c > 0 ∧
+    a * a + b * b = c * c ∧
+    a * b / 2 = n
+
+/--
+The elliptic curve E_n : y² = x³ − n²x associated to a potential
+congruent number n.
+
+We encode this as a predicate on rational points (x, y).
+-/
+def OnCurveEn (n : Nat) (x y : ℚ) : Prop :=
+  y * y = x * x * x - (n : ℚ) * n * x
+
+/--
+**BSD hypothesis for E_n:**
+The Birch and Swinnerton-Dyer conjecture predicts that the algebraic
+rank of E_n equals the analytic rank (order of vanishing of L(E_n, s)
+at s = 1). For Tunnell's theorem, we need the implication:
+
+  L(E_n, 1) ≠ 0 → rank(E_n) = 0
+
+which is the "easy" direction (known for CM curves by Coates–Wiles
+and Gross–Zagier). The converse (rank 0 → L ≠ 0) is the deep part
+needed for the full iff.
+
+We axiomatize the full BSD prediction for E_n.
+-/
+axiom BSD_rank_analytic_rank (n : Nat) :
+  -- The algebraic rank of E_n equals its analytic rank.
+  -- This is a black-box hypothesis; we do not define rank or L-functions here.
+  True  -- Placeholder: the actual statement would require algebraic geometry
+
+/--
+**Tunnell's Theorem (1983), conditional on BSD.**
+
+Let n be a positive squarefree integer.
+
+If n is odd:
+  n is congruent ↔ #{(x,y,z) ∈ ℤ³ : 2x²+y²+8z² = n}
+                   = 2 · #{(x,y,z) ∈ ℤ³ : 2x²+y²+32z² = n}
+
+If n is even (write n = 2m):
+  n is congruent ↔ #{(x,y,z) ∈ ℤ³ : 4x²+y²+8z² = m}
+                   = 2 · #{(x,y,z) ∈ ℤ³ : 4x²+y²+32z² = m}
+
+The forward direction (congruent → counts equal) is unconditional.
+The reverse direction (counts equal → congruent) requires BSD for E_n.
+
+Reference: Tunnell, J.B. "A classical Diophantine problem and
+modular forms of weight 3/2." Inventiones mathematicae 72 (1983).
+-/
+axiom tunnell_conditional_on_BSD :
+  ∀ n : Nat, IsSquarefree n →
+    -- Forward direction (unconditional):
+    (IsCongruentNumber n → isCongruentTunnell n) ∧
+    -- Reverse direction (conditional on BSD):
+    (BSD_rank_analytic_rank n → isCongruentTunnell n → IsCongruentNumber n)
+
+/--
+**Corollary (forward, unconditional):**
+If n is congruent and squarefree, the Tunnell count condition holds.
+-/
+theorem tunnell_forward (n : Nat) (hsf : IsSquarefree n)
+    (hcong : IsCongruentNumber n) :
+    isCongruentTunnell n :=
+  (tunnell_conditional_on_BSD n hsf).1 hcong
+
+/--
+**Corollary (reverse, under BSD):**
+If BSD holds and the Tunnell count condition is satisfied for a squarefree n,
+then n is a congruent number.
+-/
+theorem tunnell_reverse_under_BSD (n : Nat) (hsf : IsSquarefree n)
+    (hBSD : BSD_rank_analytic_rank n)
+    (htun : isCongruentTunnell n) :
+    IsCongruentNumber n :=
+  (tunnell_conditional_on_BSD n hsf).2 hBSD htun
 
 /--
 Lean analogue of `count_tunnell_forms` from Python.
