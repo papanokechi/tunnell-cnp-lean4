@@ -130,7 +130,239 @@ theorem solSet_neg_z {a b c t : Int} {B : Nat} {x y z : Int}
       · constructor <;> omega
   · linarith [hmem.2]
 
-/-! ### Tunnell counting (matches Python `count_tunnell_forms`) -/
+/-! ## Strengthened invariants -/
+
+/-! ### 1. Monotonicity and independence of bound
+
+Key insight: enlarging the search cube can only add solutions, never remove them.
+Once the cube is large enough to contain all solutions, the count stabilizes.
+
+For positive-definite forms with a,b,c > 0 and t ≥ 0:
+  any solution (x,y,z) satisfies |x| ≤ √(t/a), |y| ≤ √(t/b), |z| ≤ √(t/c).
+So taking B ≥ t suffices (since a,b,c ≥ 1 for our forms).
+-/
+
+/--
+Monotonicity: if B₁ ≤ B₂, every solution in the smaller cube is in the larger.
+-/
+theorem solSet_mono {a b c t : Int} {B₁ B₂ : Nat} (h : B₁ ≤ B₂) :
+    solSet a b c t B₁ ⊆ solSet a b c t B₂ := by
+  intro ⟨x, y, z⟩ hmem
+  simp [solSet, Finset.mem_filter, Finset.mem_product, Finset.mem_Icc] at hmem ⊢
+  constructor
+  · constructor
+    · constructor <;> [linarith [hmem.1.1.1]; linarith [hmem.1.1.2]]
+    · constructor
+      · constructor <;> [linarith [hmem.1.2.1.1]; linarith [hmem.1.2.1.2]]
+      · constructor <;> [linarith [hmem.1.2.2.1]; linarith [hmem.1.2.2.2]]
+  · exact hmem.2
+
+/--
+Monotonicity for cardinality: enlarging the bound cannot decrease the count.
+-/
+theorem solSet_card_mono {a b c t : Int} {B₁ B₂ : Nat} (h : B₁ ≤ B₂) :
+    (solSet a b c t B₁).card ≤ (solSet a b c t B₂).card :=
+  Finset.card_le_card (solSet_mono h)
+
+/--
+Coordinate bound for positive-definite forms:
+if a > 0 and a*x² is part of a sum equaling t ≥ 0, then |x| ≤ t.
+(Sharper bound: |x| ≤ √(t/a), but t suffices and is simpler to state.)
+
+This is the key lemma for bound independence.
+-/
+theorem coord_bound_of_sum_eq {a val t : Int}
+    (ha : a > 0) (hval : a * val * val ≤ t) (ht : t ≥ 0) :
+    val.natAbs ≤ t.natAbs := by
+  by_contra h_gt
+  push_neg at h_gt
+  -- If |val| > t.natAbs, then val² > t² ≥ t (for t ≥ 0),
+  -- so a*val² ≥ val² > t, contradicting a*val*val ≤ t.
+  -- We show val*val > t, giving a*val*val ≥ val*val > t.
+  have hv_abs : val.natAbs > t.natAbs := h_gt
+  have hv_sq : val * val ≥ (t.natAbs + 1) * (t.natAbs + 1) := by
+    have : (val.natAbs : Int) ≥ t.natAbs + 1 := by omega
+    calc val * val = (val.natAbs : Int) * (val.natAbs : Int) := by
+            simp [Int.natAbs_mul_self']
+         _ ≥ (t.natAbs + 1) * (t.natAbs + 1) := by nlinarith
+  have : (t.natAbs : Int) + 1 > 0 := by omega
+  have : (t.natAbs + 1 : Int) * (t.natAbs + 1) > t := by nlinarith [Int.natAbs_eq t, ht]
+  linarith [mul_le_mul_of_nonneg_left (le_refl (val * val)) (le_of_lt ha)]
+
+/--
+Any solution in solSet with positive-definite coefficients has all
+coordinates bounded by t.natAbs. This means B = t.natAbs is sufficient.
+-/
+theorem solSet_sufficient_bound {a b c t : Int} {B : Nat} {x y z : Int}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0)
+    (hmem : (x, y, z) ∈ solSet a b c t B) :
+    x.natAbs ≤ t.natAbs ∧ y.natAbs ≤ t.natAbs ∧ z.natAbs ≤ t.natAbs := by
+  simp [solSet, Finset.mem_filter, Finset.mem_product, Finset.mem_Icc] at hmem
+  have heq := hmem.2
+  -- From a*x² + b*y² + c*z² = t with a,b,c > 0:
+  -- a*x² ≤ t, b*y² ≤ t, c*z² ≤ t
+  have hx_sq : a * x * x ≤ t := by nlinarith [sq_nonneg y, sq_nonneg z, mul_pos hb (mul_self_nonneg y), mul_pos hc (mul_self_nonneg z)]
+  have hy_sq : b * y * y ≤ t := by nlinarith [sq_nonneg x, sq_nonneg z, mul_pos ha (mul_self_nonneg x), mul_pos hc (mul_self_nonneg z)]
+  have hz_sq : c * z * z ≤ t := by nlinarith [sq_nonneg x, sq_nonneg y, mul_pos ha (mul_self_nonneg x), mul_pos hb (mul_self_nonneg y)]
+  exact ⟨coord_bound_of_sum_eq ha hx_sq ht,
+         coord_bound_of_sum_eq hb hy_sq ht,
+         coord_bound_of_sum_eq hc hz_sq ht⟩
+
+/--
+**Independence of bound (stability):**
+For positive-definite forms with t ≥ 0, any B ≥ t.natAbs gives the same count.
+This is the central theorem: `repCount` is well-defined regardless of the specific
+bound, as long as it's large enough.
+-/
+theorem solSet_stable {a b c t : Int} {B : Nat}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0)
+    (hB : t.natAbs ≤ B) :
+    solSet a b c t B = solSet a b c t t.natAbs := by
+  ext ⟨x, y, z⟩
+  constructor
+  · intro hmem
+    have ⟨hx, hy, hz⟩ := solSet_sufficient_bound ha hb hc ht hmem
+    simp [solSet, Finset.mem_filter, Finset.mem_product, Finset.mem_Icc] at hmem ⊢
+    exact ⟨⟨⟨by omega, by omega⟩, ⟨by omega, by omega⟩, ⟨by omega, by omega⟩⟩, hmem.2⟩
+  · intro hmem
+    exact solSet_mono hB hmem
+
+/--
+Corollary: for positive-definite forms, the count at any sufficient bound
+equals the count at the canonical bound t.natAbs.
+-/
+theorem repCount_stable {a b c t : Int} {B : Nat}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0)
+    (hB : t.natAbs ≤ B) :
+    (solSet a b c t B).card = (solSet a b c t t.natAbs).card := by
+  rw [solSet_stable ha hb hc ht hB]
+
+/-! ### 2. Full sign symmetry
+
+Combine the per-coordinate negation lemmas into a single structure.
+For solutions within a sufficient bound, negation of any coordinate
+stays within the bound (since |−v| = |v|).
+-/
+
+/--
+For solutions in a sufficient bound, coordinate negation stays in-bounds.
+-/
+theorem natAbs_neg_eq (v : Int) : (-v).natAbs = v.natAbs := by
+  simp [Int.natAbs_neg]
+
+/--
+**Full sign symmetry:** if (x,y,z) solves the form within a sufficient bound,
+then all eight sign-flips are also solutions within the same bound.
+-/
+theorem solSet_sign_symmetry {a b c t : Int} {B : Nat} {x y z : Int}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0)
+    (hB : t.natAbs ≤ B)
+    (hmem : (x, y, z) ∈ solSet a b c t B) :
+    (-x, y, z) ∈ solSet a b c t B ∧
+    (x, -y, z) ∈ solSet a b c t B ∧
+    (x, y, -z) ∈ solSet a b c t B ∧
+    (-x, -y, z) ∈ solSet a b c t B ∧
+    (-x, y, -z) ∈ solSet a b c t B ∧
+    (x, -y, -z) ∈ solSet a b c t B ∧
+    (-x, -y, -z) ∈ solSet a b c t B := by
+  have ⟨hxb, hyb, hzb⟩ := solSet_sufficient_bound ha hb hc ht hmem
+  -- All negated coordinates have the same natAbs, so they're in-bounds
+  have hx_neg : (-x).natAbs ≤ B := by rw [natAbs_neg_eq]; omega
+  have hy_neg : (-y).natAbs ≤ B := by rw [natAbs_neg_eq]; omega
+  have hz_neg : (-z).natAbs ≤ B := by rw [natAbs_neg_eq]; omega
+  -- Build each sign-flip
+  have h_nx := solSet_neg_x hmem hx_neg
+  have h_ny := solSet_neg_y hmem hy_neg
+  have h_nz := solSet_neg_z hmem hz_neg
+  have h_nxny := solSet_neg_y h_nx hy_neg
+  have h_nxnz := solSet_neg_z h_nx hz_neg
+  have h_nynz := solSet_neg_z h_ny hz_neg
+  have h_nxnynz := solSet_neg_z h_nxny hz_neg
+  exact ⟨h_nx, h_ny, h_nz, h_nxny, h_nxnz, h_nynz, h_nxnynz⟩
+
+/--
+**Origin lemma:** (0,0,0) is a solution iff t = 0.
+Matches Python: `if target == 0: return 1`.
+-/
+theorem solSet_origin {a b c t : Int} {B : Nat} (hB : 0 < B) :
+    (0, 0, 0) ∈ solSet a b c t B ↔ t = 0 := by
+  simp [solSet, Finset.mem_filter, Finset.mem_product, Finset.mem_Icc]
+  constructor
+  · intro ⟨_, h⟩; linarith
+  · intro h; refine ⟨⟨⟨?_, ?_⟩, ⟨?_, ?_⟩, ⟨?_, ?_⟩⟩, ?_⟩ <;> omega
+
+/-! ### 3. Unbounded solution set and bridging lemma
+
+Define the "mathematical" solution set (unbounded) and show it agrees
+with the bounded version for any sufficient bound.
+-/
+
+/--
+The unbounded solution set: all integer triples satisfying the form equation.
+This is the "mathematical" definition, independent of any search bound.
+-/
+def solSet∞ (a b c t : Int) : Set (Int × Int × Int) :=
+  { p | let (x, y, z) := p; a * x * x + b * y * y + c * z * z = t }
+
+/--
+Every bounded solution is an unbounded solution.
+-/
+theorem solSet_sub_solSet∞ {a b c t : Int} {B : Nat} :
+    ↑(solSet a b c t B) ⊆ solSet∞ a b c t := by
+  intro ⟨x, y, z⟩ hmem
+  simp [solSet, Finset.mem_filter, Finset.mem_product, Finset.mem_Icc, Finset.mem_coe] at hmem
+  exact hmem.2
+
+/--
+For positive-definite forms with t ≥ 0, every unbounded solution
+has coordinates bounded by t.natAbs.
+
+This is the converse direction: solutions can't escape the cube.
+-/
+theorem solSet∞_bounded {a b c t : Int} {x y z : Int}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0)
+    (hmem : (x, y, z) ∈ solSet∞ a b c t) :
+    x.natAbs ≤ t.natAbs ∧ y.natAbs ≤ t.natAbs ∧ z.natAbs ≤ t.natAbs := by
+  simp [solSet∞] at hmem
+  have hx_sq : a * x * x ≤ t := by nlinarith [sq_nonneg y, sq_nonneg z, mul_pos hb (mul_self_nonneg y), mul_pos hc (mul_self_nonneg z)]
+  have hy_sq : b * y * y ≤ t := by nlinarith [sq_nonneg x, sq_nonneg z, mul_pos ha (mul_self_nonneg x), mul_pos hc (mul_self_nonneg z)]
+  have hz_sq : c * z * z ≤ t := by nlinarith [sq_nonneg x, sq_nonneg y, mul_pos ha (mul_self_nonneg x), mul_pos hb (mul_self_nonneg y)]
+  exact ⟨coord_bound_of_sum_eq ha hx_sq ht,
+         coord_bound_of_sum_eq hb hy_sq ht,
+         coord_bound_of_sum_eq hc hz_sq ht⟩
+
+/--
+**Finiteness of the unbounded solution set** for positive-definite forms.
+Since all solutions are bounded, the "infinite" solution set is actually finite.
+-/
+theorem solSet∞_finite (a b c t : Int)
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0) :
+    Set.Finite (solSet∞ a b c t) := by
+  apply Set.Finite.subset (Set.Finite.prod (Set.Finite.Icc (-(t : Int)) t)
+    (Set.Finite.prod (Set.Finite.Icc (-(t : Int)) t) (Set.Finite.Icc (-(t : Int)) t)))
+  intro ⟨x, y, z⟩ hmem
+  have ⟨hx, hy, hz⟩ := solSet∞_bounded ha hb hc ht hmem
+  simp [Set.mem_prod, Set.mem_Icc]
+  refine ⟨⟨?_, ?_⟩, ⟨?_, ?_⟩, ⟨?_, ?_⟩⟩ <;> omega
+
+/--
+**Bridging lemma:** the bounded solSet at the canonical bound captures
+exactly the unbounded solution set for positive-definite forms.
+
+This is the key correctness property: our computable `repCount` counts
+the same solutions as the mathematical definition.
+-/
+theorem solSet_eq_solSet∞ {a b c t : Int}
+    (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0) :
+    ↑(solSet a b c t t.natAbs) = solSet∞ a b c t := by
+  ext ⟨x, y, z⟩
+  constructor
+  · exact fun h => solSet_sub_solSet∞ h
+  · intro hmem
+    have ⟨hx, hy, hz⟩ := solSet∞_bounded ha hb hc ht hmem
+    simp [solSet, Finset.mem_filter, Finset.mem_product, Finset.mem_Icc, Finset.mem_coe]
+    simp [solSet∞] at hmem
+    refine ⟨⟨⟨?_, ?_⟩, ⟨?_, ?_⟩, ⟨?_, ?_⟩⟩, hmem⟩ <;> omega
 
 /--
 Lean analogue of `count_tunnell_forms` from Python.
