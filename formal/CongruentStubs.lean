@@ -11,8 +11,46 @@
     count_tunnell_forms(n) -> (A, B)       [odd/even branch]
     is_congruent_tunnell(n) -> A == 2*B
 
-  Status: 3 sorry (orbit/parity — need Finset involution lemma),
-          2 axioms (BSD placeholder, Tunnell conditional).
+  ──────────────────────────────────────────────────────────────
+  FILE TOUR (§§ 1–6)
+  ──────────────────────────────────────────────────────────────
+
+  §1 Foundations (lines ~30–70)
+     IsSquarefree, solSet, repCount — core definitions mirroring
+     Python's _count_representations and is_squarefree.
+
+  §2 Basic properties (lines ~70–130)
+     repCount_neg, repCount_nonneg, solSet_neg_x/y/z —
+     coordinate-negation symmetry (per-axis).
+
+  §3 Strengthened invariants (lines ~130–370)
+     3a. Monotonicity & bound independence:
+         solSet_mono → solSet_stable → repCount_stable.
+         Key insight: solutions are bounded by |t| for pos-def forms.
+     3b. Full sign symmetry:
+         solSet_sign_symmetry (all 8 sign-flips in one lemma).
+         solSet_origin (0,0,0 ↔ t=0).
+     3c. Unbounded bridge:
+         solSet∞ (mathematical definition) ↔ solSet at canonical bound.
+         solSet∞_finite, solSet_eq_solSet∞.
+
+  §4 Orbit pairing & evenness (lines ~370–510)
+     Generic Finset involution lemma (card_even_of_involution).
+     negTriple involution on solSetNZ → nonzero count is even.
+     repCount_parity_split, repCount_even_of_pos.
+
+  §5 Theta series (lines ~510–600)
+     thetaCoeff := repCount (combinatorial alias).
+     thetaCoeff_eq_solSet∞_card — connects to mathematical set.
+     tunnellThetaCoeffs_eq_tunnellCounts.
+
+  §6 Tunnell's theorem (lines ~600–end)
+     IsCongruentNumber, OnCurveEn, BSD axiom (placeholder).
+     tunnell_conditional_on_BSD, tunnell_forward,
+     tunnell_reverse_under_BSD.
+
+  Status: zero sorry, 2 axioms (BSD placeholder, Tunnell conditional).
+  ──────────────────────────────────────────────────────────────
 -/
 
 namespace Congruent
@@ -454,6 +492,97 @@ The nonzero solution set: solutions excluding the origin.
 def solSetNZ (a b c t : Int) (B : Nat) : Finset (Int × Int × Int) :=
   (solSet a b c t B).filter fun v => v ≠ (0, 0, 0)
 
+/-! #### Generic Finset involution lemma
+
+A Finset equipped with a fixed-point-free involution has even cardinality.
+We prove this by strong induction on the set's cardinality:
+  - If the set is empty, card = 0 which is even.
+  - Otherwise pick any element x. Its partner f(x) ≠ x is also in s.
+    Remove both; by induction the remainder has even card, so the whole
+    set has card = remainder.card + 2 which is even.
+
+This is the missing piece that closes the orbit-pairing sorry's.
+-/
+
+/--
+**Fixed-point-free involution ⇒ even cardinality.**
+
+Given a Finset s with a function f such that:
+  1. f maps s into s,
+  2. f is an involution (f(f(x)) = x),
+  3. f has no fixed points in s,
+then s has even cardinality.
+-/
+theorem card_even_of_involution [DecidableEq α]
+    (s : Finset α) (f : α → α)
+    (hf_mem : ∀ x ∈ s, f x ∈ s)
+    (hf_inv : ∀ x ∈ s, f (f x) = x)
+    (hf_fix : ∀ x ∈ s, f x ≠ x) :
+    Even s.card := by
+  -- Proof by strong induction on s.card
+  induction s using Finset.strongInduction with
+  | ind s ih =>
+    by_cases hs : s = ∅
+    · simp [hs]
+    · -- s is nonempty: pick an element x
+      obtain ⟨x, hx⟩ := Finset.nonempty_of_ne_empty hs
+      -- f x ∈ s and f x ≠ x
+      have hfx := hf_mem x hx
+      have hne := hf_fix x hx
+      -- Remove both x and f x from s
+      let s' := s.erase x |>.erase (f x)
+      -- s' is strictly smaller
+      have hs'_sub : s' ⊂ s := by
+        apply Finset.ssubset_of_subset_of_ne
+        · intro a ha
+          simp [s', Finset.mem_erase] at ha
+          exact ha.1.2
+        · intro heq
+          have : x ∈ s' := heq ▸ hx
+          simp [s', Finset.mem_erase] at this
+      -- The involution restricts to s': if y ∈ s' then f y ∈ s'
+      have hf_mem' : ∀ y ∈ s', f y ∈ s' := by
+        intro y hy
+        simp [s', Finset.mem_erase] at hy ⊢
+        have hy_s := hy.1.2
+        constructor
+        · constructor
+          · -- f y ≠ f x: if f y = f x then y = f(f y) = f(f x) = x, contradiction
+            intro h
+            have := hy.1.1  -- y ≠ f x
+            have : y = x := by
+              calc y = f (f y) := (hf_inv y hy_s).symm
+                   _ = f (f x) := by rw [h]
+                   _ = x := hf_inv x hx
+            exact hy.2 this
+          · exact hf_mem y hy_s
+        · -- f y ≠ x: if f y = x then y = f(f y) = f x, contradiction
+          intro h
+          have : y = f x := by
+            calc y = f (f y) := (hf_inv y hy_s).symm
+                 _ = f x := by rw [h]
+          exact hy.1.1 this
+      -- Involution and fixed-point-free properties transfer to s'
+      have hf_inv' : ∀ y ∈ s', f (f y) = y := fun y hy => by
+        simp [s', Finset.mem_erase] at hy; exact hf_inv y hy.1.2
+      have hf_fix' : ∀ y ∈ s', f y ≠ y := fun y hy => by
+        simp [s', Finset.mem_erase] at hy; exact hf_fix y hy.1.2
+      -- By induction, s' has even cardinality
+      have heven' := ih s' hs'_sub f hf_mem' hf_inv' hf_fix'
+      -- s.card = s'.card + 2
+      have hcard : s.card = s'.card + 2 := by
+        have h1 : (s.erase x).card = s.card - 1 := Finset.card_erase_of_mem hx
+        have hfx_in_erase : f x ∈ s.erase x := by
+          simp [Finset.mem_erase]; exact ⟨hne.symm, hfx⟩
+        have h2 : s'.card = (s.erase x).card - 1 :=
+          Finset.card_erase_of_mem hfx_in_erase
+        have hcard_pos : s.card ≥ 1 := Finset.one_le_card.mpr ⟨x, hx⟩
+        have hcard_pos2 : (s.erase x).card ≥ 1 :=
+          Finset.one_le_card.mpr ⟨f x, hfx_in_erase⟩
+        omega
+      rw [hcard]
+      exact Even.add_two heven'
+
 /--
 **Nonzero solution count is even:**
 The involution v ↦ −v pairs up all nonzero solutions (since v ≠ −v for v ≠ 0),
@@ -466,10 +595,30 @@ theorem solSetNZ_card_even {a b c t : Int} {B : Nat}
     (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t ≥ 0)
     (hB : t.natAbs ≤ B) :
     2 ∣ (solSetNZ a b c t B).card := by
-  -- We show negTriple is a fixed-point-free involution on solSetNZ.
-  -- Every Finset with a fixed-point-free involution has even cardinality.
-  -- We prove this via the general principle: partition into orbits of size 2.
-  sorry
+  -- Apply the generic involution lemma with negTriple
+  have heven := card_even_of_involution (solSetNZ a b c t B) negTriple
+    -- 1. negTriple maps solSetNZ into solSetNZ
+    (fun v hv => by
+      simp [solSetNZ, Finset.mem_filter] at hv ⊢
+      constructor
+      · exact negTriple_mem_solSet ha hb hc ht hB hv.1
+      · intro heq
+        apply hv.2
+        have := negTriple_involution v
+        rw [heq] at this
+        simp [negTriple] at this
+        obtain ⟨x, y, z⟩ := v
+        simp [negTriple] at heq
+        ext <;> omega)
+    -- 2. negTriple is an involution
+    (fun v hv => by
+      simp [solSetNZ, Finset.mem_filter] at hv
+      exact negTriple_involution v)
+    -- 3. negTriple has no fixed points (all elements are nonzero)
+    (fun v hv => by
+      simp [solSetNZ, Finset.mem_filter] at hv
+      exact negTriple_no_nonzero_fixpoint hv.2)
+  exact even_iff_two_dvd.mp heven
 
 /--
 **Total representation count parity:**
@@ -485,9 +634,34 @@ theorem repCount_parity_split {a b c t : Int}
   simp [repCount]
   split
   · omega
-  · -- The solSet splits into nonzero part and possibly the origin.
-    -- solSet = solSetNZ ∪ {(0,0,0)} ∩ solSet
-    sorry
+  · rename_i h_not_neg
+    push_neg at h_not_neg
+    -- solSet = solSetNZ ∪ (solSet ∩ {origin}), these are disjoint
+    -- We use Finset.filter_card_add_filter_neg_card_eq_card
+    have hsplit := Finset.filter_card_add_filter_neg_card_eq_card
+      (solSet a b c t t.natAbs) (fun v => v ≠ (0, 0, 0))
+    -- The "positive" filter is solSetNZ
+    -- The "negative" filter is {v ∈ solSet | v = (0,0,0)} which has card 0 or 1
+    simp [solSetNZ] at hsplit
+    -- Rewrite: solSet.card = solSetNZ.card + (solSet.filter (· = (0,0,0))).card
+    have : (solSet a b c t t.natAbs).card =
+        (solSetNZ a b c t t.natAbs).card +
+        ((solSet a b c t t.natAbs).filter fun v => v = (0, 0, 0)).card := by
+      omega
+    rw [this]
+    congr 1
+    -- The filter for equality to origin has card 1 if origin ∈ solSet, else 0
+    by_cases h : (0, 0, 0) ∈ solSet a b c t t.natAbs
+    · simp [h]
+      have : (solSet a b c t t.natAbs).filter (fun v => v = (0, 0, 0)) = {(0, 0, 0)} := by
+        ext v; simp [Finset.mem_filter]; constructor
+        · intro ⟨_, hv⟩; exact hv
+        · intro hv; exact ⟨hv ▸ h, hv⟩
+      rw [this]; simp
+    · simp [h]
+      have : (solSet a b c t t.natAbs).filter (fun v => v = (0, 0, 0)) = ∅ := by
+        ext v; simp [Finset.mem_filter]; intro _ hv; exact h (hv ▸ by assumption)
+      rw [this]; simp
 
 /--
 Corollary: for t > 0 with positive-definite coefficients, repCount is even.
@@ -496,7 +670,15 @@ This is the key arithmetic property used in Tunnell's criterion.
 theorem repCount_even_of_pos {a b c t : Int}
     (ha : a > 0) (hb : b > 0) (hc : c > 0) (ht : t > 0) :
     2 ∣ repCount a b c t := by
-  sorry
+  have ht' : t ≥ 0 := le_of_lt ht
+  rw [repCount_parity_split ha hb hc ht']
+  -- Origin is not a solution when t > 0
+  have hno_origin : (0, 0, 0) ∉ solSet a b c t t.natAbs := by
+    intro hmem
+    have := (solSet_origin (by omega : (0 : Nat) < t.natAbs)).mp hmem
+    omega
+  simp [hno_origin]
+  exact solSetNZ_card_even ha hb hc ht' (le_refl _)
 
 /-! ### 5. Theta series coefficients
 
