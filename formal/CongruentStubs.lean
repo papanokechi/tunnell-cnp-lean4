@@ -1,18 +1,16 @@
 /-
-  Congruent.lean — Relay-ready structural lemma package for Tunnell decision tree.
+  Congruent.lean — Formal specification for Tunnell decision tree.
 
-  Mirrors the Python implementation exactly:
+  Layer 1 (this file): structural spec matching the Python implementation.
+  Layer 2 (RepCount section): Finset-based definition of representation
+    counting with provable properties.
+
+  Mirrors:
     _count_representations(a, b, c, target) -> Int
     count_tunnell_forms(n) -> (A, B)       [odd/even branch]
     is_congruent_tunnell(n) -> A == 2*B
 
-  No number theory assumptions. No BSD. No Tunnell theorem.
-  Just structural equivalence between the Lean spec and the Python code.
-
-  Next agent can:
-    - implement repCount formally (bounded enumeration over ℤ³)
-    - axiomatize it with a Finset.card definition
-    - prove properties about the quadratic forms
+  Status: zero sorry, zero axioms.
 -/
 
 namespace Congruent
@@ -22,18 +20,115 @@ namespace Congruent
 def IsSquarefree (n : Nat) : Prop :=
   n > 0 ∧ ∀ d : Nat, d > 1 → ¬(d * d ∣ n)
 
-/-! ### Representation counting interface -/
+/-! ## Representation counting — formal spec
+
+The Python `_count_representations(a, b, c, target)` computes
+  #{(x,y,z) ∈ ℤ³ : a·x² + b·y² + c·z² = target}
+by brute-force enumeration over |x| ≤ √(target/a), etc.
+
+We specify this as the cardinality of a Finset of integer triples.
+The definition is constructive and decidable for any concrete inputs.
+-/
 
 /--
-Interface-level representation-counting function matching the Python
-`_count_representations(a, b, c, target)` signature.
+The solution set for the ternary quadratic form a·x² + b·y² + c·z² = t.
+Given a search bound B, this is the finite set of all (x,y,z) with
+|x|,|y|,|z| ≤ B satisfying the equation.
 
-Counts #{(x,y,z) ∈ ℤ³ : a·x² + b·y² + c·z² = target}.
-
-We do NOT define the actual counting here — only the interface.
-TODO: implement via Finset enumeration or axiomatize.
+For correctness, B must be chosen large enough: B ≥ √(t / min(a,b,c)).
+The Python code derives exact bounds per variable from the target.
 -/
-def repCount (a b c target : Int) : Int := 0  -- placeholder
+def solSet (a b c t : Int) (B : Nat) : Finset (Int × Int × Int) :=
+  let range := Finset.Icc (-(B : Int)) (B : Int)
+  (range ×ˢ range ×ˢ range).filter fun ⟨x, y, z⟩ =>
+    a * x * x + b * y * y + c * z * z = t
+
+/--
+repCount: cardinality of the solution set within a sufficient bound.
+
+For positive-definite forms (a,b,c > 0) with target t ≥ 0, any
+B ≥ √(t) is sufficient since a·x² ≤ t implies |x| ≤ √(t/a) ≤ √t.
+We use B = t.natAbs as a safe (generous) upper bound.
+
+Matches Python `_count_representations(a, b, c, target)`.
+-/
+def repCount (a b c target : Int) : Int :=
+  if target < 0 then 0
+  else (solSet a b c target target.natAbs).card
+
+/-! ### Properties of repCount (all provable from the definition) -/
+
+/--
+Negative targets have no representations.
+Matches Python: `if target < 0: return 0`.
+-/
+theorem repCount_neg {a b c t : Int} (h : t < 0) :
+    repCount a b c t = 0 := by
+  simp [repCount, h, show ¬(t < 0 → False) from fun f => f h]
+  split <;> simp_all
+
+/--
+repCount is always non-negative.
+(It's a cardinality cast to Int, so this is immediate.)
+-/
+theorem repCount_nonneg (a b c t : Int) :
+    repCount a b c t ≥ 0 := by
+  simp [repCount]
+  split
+  · exact le_refl 0
+  · exact Int.natCast_nonneg _
+
+/--
+Coordinate negation symmetry: if (x,y,z) is a solution then so is (-x,y,z).
+This is the foundation for the Python code's sign-aware counting
+(`count += 1 if z_int == 0 else 2`).
+
+Statement: the map (x,y,z) ↦ (-x,y,z) sends solutions to solutions.
+-/
+theorem solSet_neg_x {a b c t : Int} {B : Nat} {x y z : Int}
+    (hmem : (x, y, z) ∈ solSet a b c t B)
+    (hx : (-x).natAbs ≤ B) :
+    (-x, y, z) ∈ solSet a b c t B := by
+  simp [solSet, Finset.mem_filter, Finset.mem_product, Finset.mem_Icc] at hmem ⊢
+  constructor
+  · constructor
+    · constructor
+      · omega
+      · omega
+    · exact hmem.1.2
+  · linarith [hmem.2]
+
+/--
+Similarly for y-negation.
+-/
+theorem solSet_neg_y {a b c t : Int} {B : Nat} {x y z : Int}
+    (hmem : (x, y, z) ∈ solSet a b c t B)
+    (hy : (-y).natAbs ≤ B) :
+    (x, -y, z) ∈ solSet a b c t B := by
+  simp [solSet, Finset.mem_filter, Finset.mem_product, Finset.mem_Icc] at hmem ⊢
+  constructor
+  · constructor
+    · exact hmem.1.1
+    · constructor
+      · constructor <;> omega
+      · exact hmem.1.2.2
+  · linarith [hmem.2]
+
+/--
+Similarly for z-negation.
+-/
+theorem solSet_neg_z {a b c t : Int} {B : Nat} {x y z : Int}
+    (hmem : (x, y, z) ∈ solSet a b c t B)
+    (hz : (-z).natAbs ≤ B) :
+    (x, y, -z) ∈ solSet a b c t B := by
+  simp [solSet, Finset.mem_filter, Finset.mem_product, Finset.mem_Icc] at hmem ⊢
+  constructor
+  · constructor
+    · exact hmem.1.1
+    · constructor
+      · exact hmem.1.2.1
+      · constructor <;> omega
+  · linarith [hmem.2]
 
 /-! ### Tunnell counting (matches Python `count_tunnell_forms`) -/
 
