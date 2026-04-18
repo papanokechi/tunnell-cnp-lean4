@@ -46,7 +46,8 @@ elliptic curves and Tunnell's conditional theorem.
    equivalence. Both the unconditional forward direction and the
    reverse direction under BSD are formalized as corollaries.
 
-**Final tally:** zero sorry, two explicit axioms (both isolated in §6).
+**Final tally:** zero sorry, one explicit axiom (`tunnell_conditional_on_BSD`,
+isolated in §6), two opaque rank functions (`AlgebraicRank`, `AnalyticRank`).
 All earlier layers are fully constructive and self-contained.
 
 ### Computational contributions (`src/` — 98 tests, 1 skipped)
@@ -95,14 +96,14 @@ logs/              Run logs with provenance
 
 | Section | Lines | Key items |
 |---------|-------|-----------|
-| §1 Foundations | ~55–100 | `IsSquarefree`, `solSet`, `repCount` |
-| §2 Basic properties | ~100–160 | `repCount_neg`, `repCount_nonneg`, `solSet_neg_x/y/z` |
-| §3a Bound independence | ~160–310 | `solSet_mono`, `solSet_stable`, `repCount_stable` |
-| §3b Sign symmetry | ~310–380 | `solSet_sign_symmetry`, `solSet_origin` |
-| §3c Unbounded bridge | ~380–470 | `solSet∞`, `solSet∞_finite`, `solSet_eq_solSet∞` |
-| §4 Orbit pairing | ~470–650 | `card_even_of_involution`, `repCount_even_of_pos` |
-| §5 Theta series | ~650–760 | `thetaCoeff`, `thetaCoeff_eq_solSet∞_card` |
-| §6 Tunnell axiom | ~760–937 | `IsCongruentNumber`, `tunnell_conditional_on_BSD` |
+| §1 Foundations | ~66–107 | `IsSquarefree`, `solSet`, `repCount` |
+| §2 Basic properties | ~107–182 | `repCount_neg`, `repCount_nonneg`, `solSet_neg_x/y/z` |
+| §3a Bound independence | ~182–287 | `solSet_mono`, `solSet_stable`, `repCount_stable` |
+| §3b Sign symmetry | ~287–341 | `solSet_sign_symmetry`, `solSet_origin` |
+| §3c Unbounded bridge | ~341–414 | `solSet∞`, `solSet∞_finite`, `solSet_eq_solSet∞` |
+| §4 Orbit pairing | ~414–690 | `card_even_of_involution`, `repCount_even_of_pos` |
+| §5 Theta series | ~754–849 | `thetaCoeff`, `thetaCoeff_eq_solSet∞_card` |
+| §6 Tunnell axiom | ~849–end | `IsCongruentNumber`, `BSD_for`, `tunnell_conditional_on_BSD` |
 
 ## Conditional statements
 
@@ -115,8 +116,9 @@ in all computational outputs.
 ## Reproducibility
 
 `Dockerfile` provided. A fresh clone → install → `python -m src.runner`
-reproduces `data/results.csv`. The Lean file is self-contained (no
-lakefile / Mathlib dependency).
+reproduces `data/results.csv`. The Lean formalization depends on
+Mathlib4 for `Finset`, `Set`, `Int`, `Rat`, and standard algebraic
+infrastructure. No additional libraries are required.
 
 ## Git history
 

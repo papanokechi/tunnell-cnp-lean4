@@ -6,6 +6,8 @@
   Layer 3: bound independence, full sign symmetry, unbounded bridge.
   Layer 4: orbit pairing / evenness, theta series, Tunnell axiom (BSD).
 
+  Depends on: Mathlib4 (Finset, Set, Int, Rat, standard algebra).
+
   Mirrors:
     _count_representations(a, b, c, target) -> Int
     count_tunnell_forms(n) -> (A, B)       [odd/even branch]
@@ -15,15 +17,15 @@
   FILE TOUR (§§ 1–6)
   ──────────────────────────────────────────────────────────────
 
-  §1 Foundations (lines ~30–70)
+  §1 Foundations (lines ~55–100)
      IsSquarefree, solSet, repCount — core definitions mirroring
      Python's _count_representations and is_squarefree.
 
-  §2 Basic properties (lines ~70–130)
+  §2 Basic properties (lines ~100–160)
      repCount_neg, repCount_nonneg, solSet_neg_x/y/z —
      coordinate-negation symmetry (per-axis).
 
-  §3 Strengthened invariants (lines ~130–370)
+  §3 Strengthened invariants (lines ~160–470)
      3a. Monotonicity & bound independence:
          solSet_mono → solSet_stable → repCount_stable.
          Key insight: solutions are bounded by |t| for pos-def forms.
@@ -34,22 +36,28 @@
          solSet∞ (mathematical definition) ↔ solSet at canonical bound.
          solSet∞_finite, solSet_eq_solSet∞.
 
-  §4 Orbit pairing & evenness (lines ~370–510)
+  §4 Orbit pairing & evenness (lines ~470–680)
      Generic Finset involution lemma (card_even_of_involution).
      negTriple involution on solSetNZ → nonzero count is even.
      repCount_parity_split, repCount_even_of_pos.
 
-  §5 Theta series (lines ~510–600)
+  Tunnell counting defs (lines ~680–740)
+     tunnellCounts, isCongruentTunnell, tunnellCounts_cases.
+     Placed here so §5 and §6 can reference them.
+
+  §5 Theta series (lines ~740–840)
      thetaCoeff := repCount (combinatorial alias).
      thetaCoeff_eq_solSet∞_card — connects to mathematical set.
      tunnellThetaCoeffs_eq_tunnellCounts.
 
-  §6 Tunnell's theorem (lines ~600–end)
-     IsCongruentNumber, OnCurveEn, BSD axiom (placeholder).
-     tunnell_conditional_on_BSD, tunnell_forward,
-     tunnell_reverse_under_BSD.
+  §6 Tunnell's theorem (lines ~840–end)
+     IsCongruentNumber, OnCurveEn.
+     AlgebraicRank, AnalyticRank (opaque), BSD_for (meaningful Prop).
+     tunnell_conditional_on_BSD (single axiom).
+     tunnell_forward, tunnell_reverse_under_BSD.
 
-  Status: zero sorry, 2 axioms (BSD placeholder, Tunnell conditional).
+  Status: zero sorry, 1 axiom (tunnell_conditional_on_BSD).
+          2 opaque defs (AlgebraicRank, AnalyticRank).
   ──────────────────────────────────────────────────────────────
 -/
 
@@ -104,8 +112,7 @@ Matches Python: `if target < 0: return 0`.
 -/
 theorem repCount_neg {a b c t : Int} (h : t < 0) :
     repCount a b c t = 0 := by
-  simp [repCount, h, show ¬(t < 0 → False) from fun f => f h]
-  split <;> simp_all
+  simp [repCount, h]
 
 /--
 repCount is always non-negative.
@@ -680,6 +687,70 @@ theorem repCount_even_of_pos {a b c t : Int}
   simp [hno_origin]
   exact solSetNZ_card_even ha hb hc ht' (le_refl _)
 
+/-! ### Tunnell counting definitions
+
+These must appear before §5 (theta series) and §6 (Tunnell axiom),
+since both reference tunnellCounts and isCongruentTunnell.
+-/
+
+/--
+Lean analogue of `count_tunnell_forms` from Python.
+
+Matches the branching structure exactly:
+- odd n  → forms (2,1,8) and (2,1,32) with target n
+- even n → m = n/2, forms (4,1,8) and (4,1,32) with target m
+- returns (A, B)
+-/
+def tunnellCounts (n : Int) : Int × Int :=
+  if n % 2 = 1 then
+    let A := repCount 2 1 8 n
+    let B := repCount 2 1 32 n
+    (A, B)
+  else
+    let m := n / 2
+    let A := repCount 4 1 8 m
+    let B := repCount 4 1 32 m
+    (A, B)
+
+/--
+Lean analogue of `is_congruent_tunnell`.
+
+Purely structural: the predicate is exactly A = 2·B.
+The implication that this characterizes congruent numbers
+is Tunnell's theorem and is NOT stated here.
+-/
+def isCongruentTunnell (n : Int) : Prop :=
+  let (A, B) := tunnellCounts n
+  A = 2 * B
+
+/--
+Structural correctness lemma: `isCongruentTunnell n` is definitionally
+equivalent to the equality test used in the Python implementation.
+-/
+theorem isCongruentTunnell_iff (n : Int) :
+    isCongruentTunnell n ↔
+      let (A, B) := tunnellCounts n
+      A = 2 * B := by
+  constructor <;> intro h <;> exact h
+
+/--
+Domain guard: non-squarefree n are outside the Tunnell domain.
+The Python code raises ValueError for these inputs.
+-/
+def inTunnellDomain (n : Nat) : Prop :=
+  IsSquarefree n
+
+/--
+The odd/even case split is exhaustive. This witnesses that
+`tunnellCounts` covers both branches for any integer.
+-/
+theorem tunnellCounts_cases (n : Int) :
+    (n % 2 = 1 ∧ tunnellCounts n = (repCount 2 1 8 n, repCount 2 1 32 n)) ∨
+    (n % 2 ≠ 1 ∧ tunnellCounts n = (repCount 4 1 8 (n/2), repCount 4 1 32 (n/2))) := by
+  by_cases h : n % 2 = 1
+  · left; exact ⟨h, by simp [tunnellCounts, h]⟩
+  · right; exact ⟨h, by simp [tunnellCounts, h]⟩
+
 /-! ### 5. Theta series coefficients
 
 The theta series of a ternary quadratic form Q(x,y,z) = ax² + by² + cz²
@@ -782,6 +853,7 @@ of representation counts of ternary quadratic forms, conditional
 on the Birch and Swinnerton-Dyer (BSD) conjecture.
 
 We state this as an axiom with BSD as an explicit hypothesis.
+The only axioms in this file appear below.
 -/
 
 /--
@@ -802,24 +874,36 @@ We encode this as a predicate on rational points (x, y).
 def OnCurveEn (n : Nat) (x y : ℚ) : Prop :=
   y * y = x * x * x - (n : ℚ) * n * x
 
+/-! #### Abstract rank functions
+
+We introduce opaque rank functions to give the BSD axiom a
+mathematically meaningful type. These are abstract: their
+definitions are irreducible, so nothing can be proved about them
+except via the BSD axiom below.
+
+- `AlgebraicRank n`: the Mordell–Weil rank of E_n(ℚ).
+- `AnalyticRank n`: the order of vanishing of L(E_n, s) at s = 1.
+-/
+
+opaque AlgebraicRank (n : Nat) : Nat
+opaque AnalyticRank (n : Nat) : Nat
+
 /--
 **BSD hypothesis for E_n:**
 The Birch and Swinnerton-Dyer conjecture predicts that the algebraic
 rank of E_n equals the analytic rank (order of vanishing of L(E_n, s)
-at s = 1). For Tunnell's theorem, we need the implication:
+at s = 1).
 
-  L(E_n, 1) ≠ 0 → rank(E_n) = 0
+This is the precise mathematical statement: rank(E_n(ℚ)) = ord_{s=1} L(E_n, s).
+It is opaque and non-trivial — no proof or refutation is available in Lean.
 
-which is the "easy" direction (known for CM curves by Coates–Wiles
-and Gross–Zagier). The converse (rank 0 → L ≠ 0) is the deep part
-needed for the full iff.
-
-We axiomatize the full BSD prediction for E_n.
+For Tunnell's theorem, we specifically need the implication:
+  L(E_n, 1) ≠ 0  →  rank(E_n) = 0
+which is the Coates–Wiles / Gross–Zagier direction. The converse
+(rank 0 → L ≠ 0) is the deep part needed for the full iff.
 -/
-axiom BSD_rank_analytic_rank (n : Nat) :
-  -- The algebraic rank of E_n equals its analytic rank.
-  -- This is a black-box hypothesis; we do not define rank or L-functions here.
-  True  -- Placeholder: the actual statement would require algebraic geometry
+def BSD_for (n : Nat) : Prop :=
+  AlgebraicRank n = AnalyticRank n
 
 /--
 **Tunnell's Theorem (1983), conditional on BSD.**
@@ -845,7 +929,7 @@ axiom tunnell_conditional_on_BSD :
     -- Forward direction (unconditional):
     (IsCongruentNumber n → isCongruentTunnell n) ∧
     -- Reverse direction (conditional on BSD):
-    (BSD_rank_analytic_rank n → isCongruentTunnell n → IsCongruentNumber n)
+    (BSD_for n → isCongruentTunnell n → IsCongruentNumber n)
 
 /--
 **Corollary (forward, unconditional):**
@@ -862,76 +946,9 @@ If BSD holds and the Tunnell count condition is satisfied for a squarefree n,
 then n is a congruent number.
 -/
 theorem tunnell_reverse_under_BSD (n : Nat) (hsf : IsSquarefree n)
-    (hBSD : BSD_rank_analytic_rank n)
+    (hBSD : BSD_for n)
     (htun : isCongruentTunnell n) :
     IsCongruentNumber n :=
   (tunnell_conditional_on_BSD n hsf).2 hBSD htun
-
-/--
-Lean analogue of `count_tunnell_forms` from Python.
-
-Matches the branching structure exactly:
-- odd n  → forms (2,1,8) and (2,1,32) with target n
-- even n → m = n/2, forms (4,1,8) and (4,1,32) with target m
-- returns (A, B)
--/
-def tunnellCounts (n : Int) : Int × Int :=
-  if n % 2 = 1 then
-    let A := repCount 2 1 8 n
-    let B := repCount 2 1 32 n
-    (A, B)
-  else
-    let m := n / 2
-    let A := repCount 4 1 8 m
-    let B := repCount 4 1 32 m
-    (A, B)
-
-/-! ### Congruent-number predicate (matches Python `is_congruent_tunnell`) -/
-
-/--
-Lean analogue of `is_congruent_tunnell`.
-
-Purely structural: the predicate is exactly A = 2·B.
-The implication that this characterizes congruent numbers
-is Tunnell's theorem and is NOT stated here.
--/
-def isCongruentTunnell (n : Int) : Prop :=
-  let (A, B) := tunnellCounts n
-  A = 2 * B
-
-/-! ### Structural correctness -/
-
-/--
-Structural correctness lemma: `isCongruentTunnell n` is definitionally
-equivalent to the equality test used in the Python implementation.
-
-No number theory. No BSD. No analytic assumptions.
-Provable by `rfl` — this is a definitional unfolding.
--/
-theorem isCongruentTunnell_iff (n : Int) :
-    isCongruentTunnell n ↔
-      let (A, B) := tunnellCounts n
-      A = 2 * B := by
-  constructor <;> intro h <;> exact h
-
-/--
-Domain guard: non-squarefree n are outside the Tunnell domain.
-The Python code raises ValueError for these inputs.
--/
-def inTunnellDomain (n : Nat) : Prop :=
-  IsSquarefree n
-
-/-! ### Case-split structure (for future provers) -/
-
-/--
-The odd/even case split is exhaustive. This witnesses that
-`tunnellCounts` covers both branches for any integer.
--/
-theorem tunnellCounts_cases (n : Int) :
-    (n % 2 = 1 ∧ tunnellCounts n = (repCount 2 1 8 n, repCount 2 1 32 n)) ∨
-    (n % 2 ≠ 1 ∧ tunnellCounts n = (repCount 4 1 8 (n/2), repCount 4 1 32 (n/2))) := by
-  by_cases h : n % 2 = 1
-  · left; exact ⟨h, by simp [tunnellCounts, h]⟩
-  · right; exact ⟨h, by simp [tunnellCounts, h]⟩
 
 end Congruent
