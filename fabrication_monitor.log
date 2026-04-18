@@ -1,0 +1,3 @@
+# congruent-relay fabrication monitor
+# Every automated inference is logged here with verification status.
+# Format: timestamp | module | claim | verified_by | status
