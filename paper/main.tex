@@ -558,6 +558,31 @@ This three-level separation (\lean{opaque} quantities $\to$
 \lean{def} hypothesis $\to$ \lean{axiom} theorem) makes the
 dependency structure maximally transparent.
 
+\paragraph{Correctness risk analysis.}
+A natural concern with axiom isolation is that the axiom boundary
+might be drawn vacuously---allowing everything to be ``proved''
+from an inconsistent or trivially true axiom.  We address this
+explicitly:
+\begin{enumerate}[nosep]
+  \item The axiom \lean{tunnell\_conditional\_on\_BSD} is
+    \emph{conditional}: it asserts Tunnell's criterion only under
+    the hypothesis $\BSDfor(n)$, which is a mathematically
+    non-trivial proposition equating algebraic and analytic ranks.
+    Replacing $\BSDfor(n)$ with \lean{True} would be flagged
+    immediately by inspecting the axiom statement.
+  \item The opaque definitions \lean{AlgebraicRank} and
+    \lean{AnalyticRank} carry no properties---they are
+    ``black boxes'' of type $\mathbb{N} \to \mathbb{N}$.  No
+    theorem in the development can extract information from them
+    except through the single axiom.
+  \item Running \texttt{\#print axioms tunnell\_forward} in Lean
+    confirms that the forward direction requires \emph{zero}
+    custom axioms---only Lean's built-in \lean{propext},
+    \lean{Quot.sound}, and classical logic.
+\end{enumerate}
+This layered defense ensures that the axiom boundary is auditable
+and non-vacuous.
+
 % ═════════════════════════════════════════════════════════════════════
 \section{Evaluation}\label{sec:eval}
 
@@ -643,6 +668,21 @@ weight, the Shimura correspondence, or the analytic continuation
 of $L$-functions---all of which are needed for Tunnell's
 \emph{proof}.  We formalize Tunnell's \emph{statement}, not its
 proof.
+
+\paragraph{Limits of automation.}
+Lean's kernel checks every proof term, but it cannot verify
+claims outside the formal language.  In particular:
+\begin{itemize}[nosep]
+  \item The \emph{mathematical correctness} of the axiom---that
+    Tunnell's theorem is actually true under BSD---rests on
+    the published proof~\cite{Tunnell1983}, not on Lean.
+  \item The Python pipeline is \emph{not} formally verified;
+    its correctness is established by testing against OEIS data
+    and by structural mirroring of the Lean definitions.
+  \item The opaque rank functions cannot be evaluated inside Lean.
+    Any future replacement with computable definitions would
+    require formalizing substantial $L$-function theory.
+\end{itemize}
 
 \paragraph{Future directions.}
 \begin{enumerate}[nosep]
@@ -823,5 +863,21 @@ OEIS Foundation,
 \url{https://oeis.org/A003273}.
 
 \end{thebibliography}
+
+% ═════════════════════════════════════════════════════════════════════
+\section*{Computational and AI-Assistance Disclosure}
+
+The computational experiments, Lean development, and auxiliary
+numerical checks in this project were carried out within a
+reproducible, multi-tool workflow.  Code generation, refactoring,
+and workspace automation were assisted by GitHub Copilot within
+Visual Studio Code, while high-level planning and editorial
+refinement benefited from conversational AI tools.  All
+mathematical statements, Lean proofs, and numerical results were
+independently verified by the author using explicit Lean~4 proofs
+and reproducible Python scripts based on \texttt{mpmath}
+version~1.3.0.  The full codebase, test logs, and archived
+artifacts supporting this work are available at the project
+repository.
 
 \end{document}
