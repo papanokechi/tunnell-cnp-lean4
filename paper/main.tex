@@ -3,7 +3,7 @@
 %  Number Problem up to Tunnell's Criterion
 %
 %  Manuscript for internal peer review — April 2026
-%  Repository: congruent-relay, commit 5b42d4b
+%  Repository: https://github.com/papanokechi/congruent-relay
 % ─────────────────────────────────────────────────────────────────────
 \documentclass[11pt,a4paper]{article}
 
@@ -103,7 +103,9 @@ theta-series interface that recovers Tunnell's counting quantities.
 
 The formal development is paired with a Python computational pipeline
 (98 tests, validated against OEIS~A003273) that verifies Tunnell's
-criterion for all squarefree~$n \le 500$.
+criterion for all squarefree~$n \le 500$.  Code and artifacts are
+available at
+\url{https://github.com/papanokechi/congruent-relay}.
 \end{abstract}
 
 % ═════════════════════════════════════════════════════════════════════
@@ -210,12 +212,12 @@ Several large-scale Lean formalizations provide context for our work.
 The Fermat's Last Theorem (FLT) project~\cite{FLT2024} is formalizing
 the full proof of FLT in Lean~4, substantially expanding the
 Mathlib infrastructure for algebraic geometry and automorphic forms.
-Carneiro et al.\ formalized the prime number theorem in
-Lean~4~\cite{PNTLean2024}, demonstrating that non-trivial
+Kontorovich, Sedl\'{a}\v{c}ek, Tao, and over 60 contributors
+formalized the prime number theorem (with classical error term)
+in Lean~4~\cite{PNTLean2024}, demonstrating that non-trivial
 analytic number theory is within reach.
-Kontorovich and collaborators have formalized the theory of
-continued fractions and related number-theoretic
-algorithms~\cite{KontorovichLean2024}.
+The Mathlib library also includes continued fraction theory,
+formalized by Kappelmann~\cite{Kappelmann2024}.
 Our contribution is complementary: we operate in a regime where
 the analytic content is deliberately \emph{not} formalized, and
 instead demonstrate a principled pattern for axiom isolation.
@@ -558,30 +560,49 @@ This three-level separation (\lean{opaque} quantities $\to$
 \lean{def} hypothesis $\to$ \lean{axiom} theorem) makes the
 dependency structure maximally transparent.
 
-\paragraph{Correctness risk analysis.}
-A natural concern with axiom isolation is that the axiom boundary
-might be drawn vacuously---allowing everything to be ``proved''
-from an inconsistent or trivially true axiom.  We address this
-explicitly:
+\begin{theorem}[Axiom non-vacuity]\label{thm:nonvacuity}
+The axiom boundary of the formalization is non-vacuous in the
+following precise sense:
 \begin{enumerate}[nosep]
-  \item The axiom \lean{tunnell\_conditional\_on\_BSD} is
+  \item\label{it:conditional}
+    The axiom \lean{tunnell\_conditional\_on\_BSD} is
     \emph{conditional}: it asserts Tunnell's criterion only under
     the hypothesis $\BSDfor(n)$, which is a mathematically
     non-trivial proposition equating algebraic and analytic ranks.
     Replacing $\BSDfor(n)$ with \lean{True} would be flagged
     immediately by inspecting the axiom statement.
-  \item The opaque definitions \lean{AlgebraicRank} and
+  \item\label{it:opaque}
+    The opaque definitions \lean{AlgebraicRank} and
     \lean{AnalyticRank} carry no properties---they are
     ``black boxes'' of type $\mathbb{N} \to \mathbb{N}$.  No
     theorem in the development can extract information from them
     except through the single axiom.
-  \item Running \texttt{\#print axioms tunnell\_forward} in Lean
+  \item\label{it:printaxioms}
+    Running \texttt{\#print axioms tunnell\_forward} in Lean
     confirms that the forward direction requires \emph{zero}
-    custom axioms---only Lean's built-in \lean{propext},
-    \lean{Quot.sound}, and classical logic.
+    custom axioms.  Its full output is:
+\begin{lstlisting}[numbers=none,frame=none,xleftmargin=2em]
+-- #print axioms tunnell_forward
+'tunnell_forward' depends on axioms:
+  [propext, Classical.choice, Quot.sound]
+\end{lstlisting}
+    These are Lean's built-in axioms (proposition extensionality,
+    the axiom of choice, and quotient soundness); none is
+    project-specific.
 \end{enumerate}
-This layered defense ensures that the axiom boundary is auditable
-and non-vacuous.
+\end{theorem}
+\begin{proof}[Proof sketch]
+Item~\ref{it:conditional} is verified by reading the axiom
+statement (Appendix~\ref{app:code}).  Item~\ref{it:opaque}
+follows from the Lean~4 semantics of \lean{opaque}: no reduction
+rule is generated, so no downstream theorem can case-split or
+compute with the rank functions.  Item~\ref{it:printaxioms} is
+a machine-checkable fact: Lean's \texttt{\#print axioms} command
+recursively collects all axioms transitively used by a declaration.
+\end{proof}
+
+The three-level architecture thus provides a layered, auditable
+defense against vacuous axiom boundaries.
 
 % ═════════════════════════════════════════════════════════════════════
 \section{Evaluation}\label{sec:eval}
@@ -842,14 +863,17 @@ K.~Buzzard et al.,
 \url{https://imperialcollegelondon.github.io/FLT/}, 2024.
 
 \bibitem{PNTLean2024}
-A.~Kontorovich et al.,
-``A formal proof of the prime number theorem,''
-Lean~4 formalization, 2024.
+A.~Kontorovich, V.~Sedl\'{a}\v{c}ek, T.~Tao, et al.,
+``PrimeNumberTheoremAnd: A formal proof of the prime number
+theorem with classical error term in Lean~4,''
+\url{https://github.com/AlexKontorovich/PrimeNumberTheoremAnd},
+2024.
 
-\bibitem{KontorovichLean2024}
-A.~Kontorovich and V.~Gusev,
-``Formalizing continued fractions in Lean~4,''
-Lean~4 formalization, 2024.
+\bibitem{Kappelmann2024}
+K.~Kappelmann,
+``Continued fractions in Mathlib,''
+in \emph{Mathlib4}, module \texttt{Algebra.ContinuedFractions},
+\url{https://github.com/leanprover-community/mathlib4}, 2024.
 
 \bibitem{Scholze2022}
 P.~Scholze,
