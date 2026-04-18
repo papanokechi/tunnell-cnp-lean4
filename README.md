@@ -15,7 +15,7 @@ and axiom-free, culminating in a clean interface where the only remaining
 assumptions are the Birch–Swinnerton-Dyer conjecture for the relevant
 elliptic curves and Tunnell's conditional theorem.
 
-### Formal contributions (`formal/CongruentStubs.lean` — 937 lines, zero sorry)
+### Formal contributions (`formal/CongruentStubs.lean` — 954 lines, zero sorry)
 
 1. **Bound independence for ternary quadratic forms.**
    The bounded solution set `solSet t B` stabilizes for all B ≥ |t|, and
@@ -42,9 +42,10 @@ elliptic curves and Tunnell's conditional theorem.
    theorem.
 
 6. **Tunnell's criterion under BSD.**
-   `IsCongruentNumber`, `OnCurveEn`, BSD axiom, Tunnell conditional
-   equivalence. Both the unconditional forward direction and the
-   reverse direction under BSD are formalized as corollaries.
+   `IsCongruentNumber`, `OnCurveEn`, opaque rank functions
+   (`AlgebraicRank`, `AnalyticRank`), `BSD_for` (meaningful Prop),
+   Tunnell conditional axiom. Both the unconditional forward
+   direction and the reverse direction under BSD are corollaries.
 
 **Final tally:** zero sorry, one explicit axiom (`tunnell_conditional_on_BSD`,
 isolated in §6), two opaque rank functions (`AlgebraicRank`, `AnalyticRank`).
@@ -78,7 +79,7 @@ python -m src.runner --max-n 500  # full scan (185/306 congruent)
 ## Project layout
 
 ```
-formal/            Lean 4 formalization (937 lines, 0 sorry, 2 axioms)
+formal/            Lean 4 formalization (954 lines, 0 sorry, 1 axiom, 2 opaque)
   CongruentStubs.lean   §§1–6: definitions → Tunnell axiom
 src/               Python computational pipeline
   counts.py            Tunnell counting
@@ -110,7 +111,7 @@ logs/              Run logs with provenance
 Results linking Tunnell counts to congruent-number status are
 **conditional on the Birch and Swinnerton-Dyer conjecture**.
 This dependency is explicitly axiomatized in the Lean formalization
-(`BSD_rank_analytic_rank`, `tunnell_conditional_on_BSD`) and labeled
+(`BSD_for`, `tunnell_conditional_on_BSD`) and labeled
 in all computational outputs.
 
 ## Reproducibility
@@ -129,6 +130,8 @@ a3820a9  bootstrap: Tunnell counting, elliptic utils, triangle search, PSLQ hunt
 fb656ad  formal: bound independence, full sign symmetry, unbounded bridge
 fa3c8ea  formal: orbit pairing, theta series, Tunnell axiom (BSD)
 1c4581c  formal: close all sorry's — Finset involution lemma + file tour
+023c730  README: submission-ready project statement
+95a5202  Address reviewer feedback: meaningful BSD, fix forward refs, clarify deps
 ```
 
 ## License
