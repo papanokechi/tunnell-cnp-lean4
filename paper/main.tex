@@ -74,7 +74,7 @@
   Congruent Number Problem up to Tunnell's Criterion%
 }
 \author{Papanokechi}
-\date{April 2026 \quad---\quad Internal Review Draft}
+\date{April 2026}
 
 \begin{document}
 \maketitle
@@ -95,11 +95,13 @@ $\BSDfor(n) \coloneqq \mathrm{AlgebraicRank}(n) =
 \mathrm{AnalyticRank}(n)$, where both rank functions are opaque
 definitions, preventing vacuous discharge.
 
-Key contributions include a generic fixed-point-free involution lemma
-on \lean{Finset} (proved by strong induction), an eightfold sign
-symmetry for positive-definite ternary quadratic forms, a bridging
-theorem connecting bounded and unbounded solution sets, and a
-theta-series interface that recovers Tunnell's counting quantities.
+Key contributions include a formal non-vacuity proof for the axiom
+boundary (Theorem~\ref{thm:nonvacuity}), a generic fixed-point-free
+involution lemma on \lean{Finset} (proved by strong induction), an
+eightfold sign symmetry for positive-definite ternary quadratic
+forms, a bridging theorem connecting bounded and unbounded solution
+sets, and a theta-series interface that recovers Tunnell's counting
+quantities.
 
 The formal development is paired with a Python computational pipeline
 (98 tests, validated against OEIS~A003273) that verifies Tunnell's
@@ -235,9 +237,9 @@ not in what lies on either side.
 
 \paragraph{Computational verification.}
 The congruent number problem has been treated computationally by many
-authors.  Brent and van~de~Lune~\cite{BrentVanDeLune2007} verified
-congruent numbers up to~$10^6$ using a combination of analytic and
-algebraic methods.  Our contribution is orthogonal: we do not push
+authors.  Databases such as the LMFDB~\cite{LMFDB2024} contain
+verified congruent number data, and Tunnell's criterion has been
+applied computationally to bounds exceeding~$10^6$.  Our contribution is orthogonal: we do not push
 computational boundaries but instead provide a machine-checked proof
 that the combinatorial layer of Tunnell's criterion is correctly
 implemented, paired with an explicit comparison against
@@ -847,10 +849,10 @@ The Mathlib Community,
 ``Mathlib4: The Lean 4 Mathematical Library,''
 \url{https://github.com/leanprover-community/mathlib4}, 2024.
 
-\bibitem{BrentVanDeLune2007}
-R.\,P.~Brent and J.~van de~Lune,
-``A note on the computation of congruent numbers,''
-manuscript, 2007.
+\bibitem{LMFDB2024}
+The LMFDB Collaboration,
+``The L-functions and Modular Forms DataBase,''
+\url{https://www.lmfdb.org}, 2024.
 
 \bibitem{BuzzardEtAl2020}
 K.~Buzzard, J.~Commelin, and P.~Massot,
