@@ -1,0 +1,46 @@
+\documentclass[11pt,a4paper]{letter}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+
+\signature{Papanokechi}
+\date{April 26, 2026}
+
+\begin{document}
+\begin{letter}{%
+  The Editors \\
+  \emph{Journal of Automated Reasoning} \\
+  Springer}
+
+\opening{Dear Editors,}
+
+I am writing to submit the manuscript entitled
+\emph{``A Layered, Axiom-Isolated Lean~4 Formalization of the
+Congruent Number Problem up to Tunnell's Criterion''}
+for consideration for publication in the
+\emph{Journal of Automated Reasoning}.
+
+The paper presents a 954-line Lean~4 formalization of the
+combinatorial backbone of Tunnell's criterion for the congruent
+number problem, organized into six layers with a clean axiom
+boundary isolating the Birch and Swinnerton-Dyer conjecture.
+The formalization contains zero \texttt{sorry} placeholders and
+introduces a formal non-vacuity proof for the axiom boundary.
+A companion Python pipeline validates the criterion computationally
+against OEIS~A003273 for all squarefree~$n \le 500$.
+
+The manuscript is original work, has not been published previously,
+and is not under consideration by any other journal.
+This research received no external funding.
+
+Code and artifacts are publicly available at
+\url{https://github.com/papanokechi/congruent-relay}.
+
+Thank you for considering this submission.
+
+\closing{Sincerely,}
+
+\end{letter}
+\end{document}
