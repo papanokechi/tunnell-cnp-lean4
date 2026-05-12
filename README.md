@@ -1,7 +1,11 @@
-# congruent-relay
+# Tunnell CNP Lean 4 — A Layered, Axiom-Isolated Formalization
 
-**A Layered, Axiom-Isolated Formalization of the Congruent Number Problem
-up to Tunnell's Criterion in Lean 4**
+**Formalization of the Congruent Number Problem up to Tunnell's Criterion
+in Lean 4, paired with a Python computational pipeline.**
+
+Repository: <https://github.com/papanokechi/tunnell-cnp-lean4>
+Zenodo: [10.5281/zenodo.19834824](https://doi.org/10.5281/zenodo.19834824)
+ORCID: 0009-0000-6192-8273
 
 ## Abstract
 
